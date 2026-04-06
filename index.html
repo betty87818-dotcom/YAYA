@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌟 班級超級之星 🌟</title>
+    <!-- Tailwind CSS (用於快速排版與設計) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDK (雲端存檔必須) -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        // === 必須的 Firebase 初始化模式 ===
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'class-star-html-v1';
+
+        // 將 Firebase 實體暴露到全域，供一般 JS 使用
+        window.firebaseAuth = auth;
+        window.firebaseDb = db;
+        window.firebaseAppId = appId;
+        window.firebaseSetDoc = setDoc;
+        window.firebaseDoc = doc;
+        window.firebaseOnSnapshot = onSnapshot;
+        window.firebaseSignInAnonymously = signInAnonymously;
+        window.firebaseSignInWithCustomToken = signInWithCustomToken;
+        window.firebaseOnAuthStateChanged = onAuthStateChanged;
+
+        // 初始化認證
+        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+            signInWithCustomToken(auth, __initial_auth_token).catch(console.error);
+        } else {
+            signInAnonymously(auth).catch(console.error);
+        }
+    </script>
+
+    <style>
+        /* --- 自訂動畫與特效 --- */
+        @import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap');
+        
+        body { font-family: 'Nunito', 'Microsoft JhengHei', sans-serif; background-color: #f8fafc; overflow-x: hidden; }
+        
+        .card-pop { transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        .card-pop:hover { transform: translateY(-5px); }
+        .card-pop:active { transform: scale(0.95); }
+
+        .score-bump { animation: scoreBump 0.3s cubic-bezier(0.34, 1.56, 0.64, 1); }
+        @keyframes scoreBump { 0% { transform: scale(1); } 50% { transform: scale(1.5); color: #ef4444; } 100% { transform: scale(1); } }
+
+        .level-up-glow { animation: levelUpGlow 1.5s ease-out; }
+        @keyframes levelUpGlow { 0% { transform: scale(1) rotate(0deg); filter: brightness(1); } 50% { transform: scale(2) rotate(360deg); filter: brightness(2) drop-shadow(0 0 20px yellow); } 100% { transform: scale(1) rotate(360deg); filter: brightness(1); } }
+
+        @keyframes pulse-slow { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.9; transform: scale(1.02); } }
+        .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
+        
+        @keyframes bounce-slow { 0%, 100% { transform: translateY(-5%); animation-timing-function: cubic-bezier(0.8,0,1,1); } 50% { transform: translateY(0); animation-timing-function: cubic-bezier(0,0,0.2,1); } }
+        .animate-bounce-slow { animation: bounce-slow 2s infinite; }
+
+        @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin-slow { animation: spin-slow 10s linear infinite; }
+
+        @keyframes float-up { 0% { opacity: 0; transform: translateY(10px) scale(0.9); } 20% { opacity: 1; transform: translateY(0) scale(1); } 80% { opacity: 1; transform: translateY(-5px); } 100% { opacity: 0; transform: translateY(-15px); } }
+        .animate-float-up { animation: float-up 4s ease-out forwards; }
+
+        /* 彩帶特效 */
+        @keyframes fall { 0% { transform: translateY(-10vh) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+        .confetti { position: fixed; top: -10px; z-index: 9999; width: 12px; height: 12px; animation: fall linear forwards; pointer-events: none; }
+
+        /* 卡牌翻轉特效 */
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+
+        /* 自訂捲軸 */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="text-slate-800 pb-12">
+
+    <!-- 彩帶容器 -->
+    <div id="confetti-container"></div>
+
+    <div class="max-w-7xl mx-auto p-2 sm:p-4">
+        
+        <!-- 🌟 頂部：全班共同集氣條 -->
+        <div class="mb-4 bg-white p-4 sm:px-6 sm:py-4 rounded-3xl shadow-sm border-2 border-indigo-100 flex flex-col sm:flex-row items-center gap-4">
+            <div class="flex items-center gap-2 min-w-max">
+                <i class="fa-solid fa-bullseye text-indigo-500 text-3xl"></i>
+                <h2 class="text-xl font-black text-indigo-700">全班集氣目標</h2>
+            </div>
+            <div class="flex-1 w-full flex items-center gap-3">
+                <div class="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden shadow-inner relative border border-slate-200">
+                    <div id="class-progress-bar" class="h-full bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-500 transition-all duration-1000 ease-out relative" style="width: 0%;">
+                        <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    </div>
+                </div>
+                <div class="font-black text-2xl tabular-nums text-indigo-600 min-w-[100px] text-right">
+                    <span id="class-score-display">0</span> / 
+                    <span id="class-goal-display" class="cursor-pointer hover:bg-indigo-50 px-2 rounded" onclick="toggleGoalEdit()">200</span>
+                    <input type="number" id="class-goal-input" class="hidden w-16 bg-indigo-50 border-b-2 border-indigo-300 text-center outline-none" onblur="saveGoal(this.value)" onkeypress="if(event.key === 'Enter') this.blur();">
+                </div>
+            </div>
+            <div id="goal-reached-badge" class="hidden text-pink-500 font-black animate-bounce whitespace-nowrap px-2 py-1 bg-pink-100 rounded-xl border border-pink-200">🎉 達標啦！</div>
+        </div>
+
+        <!-- 標題與工具列 -->
+        <div class="flex flex-col lg:flex-row justify-between items-center mb-6 gap-4 bg-white p-4 rounded-3xl shadow-sm border-2 border-slate-200">
+            <div class="flex items-center gap-2">
+                <i class="fa-solid fa-bolt text-yellow-500 text-3xl animate-pulse"></i>
+                <h1 class="text-2xl sm:text-3xl font-black text-slate-700 tracking-wide">星際寵物爭霸戰</h1>
+                <div class="ml-2 flex items-center text-xs font-bold px-2 py-1 rounded-full bg-slate-100" id="sync-status">
+                    <i class="fa-solid fa-check text-green-500 mr-1"></i><span class="text-slate-500 hidden sm:inline">已儲存</span>
+                </div>
+            </div>
+            
+            <div class="flex flex-wrap justify-center gap-2 sm:gap-3">
+                <button onclick="toggleSound()" class="flex items-center justify-center p-2 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all" title="開關音效">
+                    <i id="sound-icon" class="fa-solid fa-volume-high text-xl"></i>
+                </button>
+                <button onclick="openModal('quest')" class="flex items-center gap-2 px-4 py-2 rounded-xl font-bold bg-gradient-to-r from-emerald-400 to-teal-500 text-white hover:from-emerald-500 hover:to-teal-600 shadow-md shadow-teal-200 transition-all card-pop">
+                    <i class="fa-solid fa-scroll animate-bounce"></i><span class="hidden sm:inline">每日任務</span>
+                </button>
+                <button onclick="openModal('settlement')" class="flex items-center gap-2 px-4 py-2 rounded-xl font-bold bg-gradient-to-r from-blue-500 to-indigo-600 text-white hover:from-blue-600 hover:to-indigo-700 shadow-md shadow-indigo-200 transition-all card-pop">
+                    <i class="fa-solid fa-trophy"></i><span>每週結算</span>
+                </button>
+                <button onclick="openGacha()" class="flex items-center gap-2 px-4 py-2 rounded-xl font-bold bg-gradient-to-r from-yellow-400 to-orange-400 text-white hover:from-yellow-500 hover:to-orange-500 shadow-md shadow-orange-200 transition-all card-pop">
+                    <i class="fa-solid fa-gift animate-bounce"></i><span class="hidden sm:inline">驚喜抽卡</span>
+                </button>
+                <button onclick="toggleEditMode()" id="edit-btn" class="flex items-center gap-2 px-4 py-2 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all card-pop">
+                    <i class="fa-solid fa-gear"></i><span class="hidden sm:inline">設定</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 小組卡片網格 -->
+        <div id="groups-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            <!-- 卡片由 JS 動態生成 -->
+        </div>
+
+    </div>
+
+    <!-- === 所有彈出視窗 === -->
+    <div id="modal-overlay" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-50 p-4 hidden">
+        
+        <!-- 每日任務 -->
+        <div id="modal-quest" class="hidden bg-[#fdf6e3] rounded-3xl p-8 max-w-md w-full shadow-2xl border-[8px] border-double border-amber-800 text-center relative">
+            <button onclick="closeModal()" class="absolute top-4 right-4 w-10 h-10 bg-amber-200 rounded-full flex items-center justify-center text-amber-800 hover:bg-amber-300 font-bold"><i class="fa-solid fa-xmark"></i></button>
+            <i class="fa-solid fa-scroll text-6xl text-amber-600 mb-4 animate-bounce"></i>
+            <h3 class="text-3xl font-black text-amber-900 mb-6 border-b-2 border-amber-300 pb-4">📜 今日突發任務 📜</h3>
+            <p id="quest-content" class="text-2xl font-bold text-amber-800 leading-relaxed mb-8">任務內容載入中...</p>
+            <button onclick="closeModal()" class="px-8 py-3 rounded-full font-black bg-amber-700 text-amber-50 hover:bg-amber-800 shadow-lg card-pop text-lg">接受挑戰！</button>
+        </div>
+
+        <!-- 每週結算 -->
+        <div id="modal-settlement" class="hidden bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border-4 border-indigo-200 text-center">
+            <i class="fa-solid fa-crown text-6xl text-yellow-500 mb-4 animate-bounce"></i>
+            <h3 class="text-3xl font-black text-indigo-800 mb-2">🎊 本週結算典禮 🎊</h3>
+            <div id="settlement-content" class="my-6">
+                <!-- 冠軍內容由 JS 產生 -->
+            </div>
+            <div class="flex gap-4 mt-6">
+                <button onclick="closeModal()" class="flex-1 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">再等一下</button>
+                <button onclick="executeSettlement()" class="flex-1 py-3 rounded-xl font-bold bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg shadow-indigo-200 card-pop">頒發獎盃並重新開始</button>
+            </div>
+        </div>
+
+        <!-- 驚喜抽卡 -->
+        <div id="modal-gacha" class="hidden bg-amber-50 rounded-3xl p-6 sm:p-8 max-w-2xl w-full shadow-2xl border-4 border-amber-200 text-center relative">
+            <button onclick="closeModal()" class="absolute top-4 right-4 w-10 h-10 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-300 font-bold"><i class="fa-solid fa-xmark"></i></button>
+            <i class="fa-solid fa-gift text-5xl text-orange-500 mb-2 animate-bounce"></i>
+            <h3 class="text-3xl font-black text-orange-600 mb-2">幸運大抽獎</h3>
+            <p class="text-amber-700 font-bold mb-6">請選擇一張命運卡牌翻開！</p>
+            
+            <div id="gacha-cards" class="flex flex-col sm:flex-row gap-4 justify-center">
+                <!-- 卡片由 JS 產生 -->
+            </div>
+
+            <div id="gacha-result" class="hidden mt-8 transition-all duration-500">
+                <p class="text-xl font-black text-green-600 mb-4">恭喜獲得超棒獎勵！</p>
+                <button onclick="closeModal()" class="px-8 py-3 rounded-full font-black bg-orange-500 text-white hover:bg-orange-600 shadow-lg card-pop text-lg">開心收下！</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- === 主要邏輯 Script === -->
+    <script>
+        // === 資料定義 ===
+        const CUTE_COLORS = [
+            { bg: 'bg-pink-50', border: 'border-pink-300', text: 'text-pink-700', btnGood: 'bg-pink-400 hover:bg-pink-500' },
+            { bg: 'bg-blue-50', border: 'border-blue-300', text: 'text-blue-700', btnGood: 'bg-blue-400 hover:bg-blue-500' },
+            { bg: 'bg-green-50', border: 'border-green-300', text: 'text-green-700', btnGood: 'bg-green-400 hover:bg-green-500' },
+            { bg: 'bg-yellow-50', border: 'border-yellow-300', text: 'text-yellow-700', btnGood: 'bg-yellow-400 hover:bg-yellow-500' },
+            { bg: 'bg-purple-50', border: 'border-purple-300', text: 'text-purple-700', btnGood: 'bg-purple-400 hover:bg-purple-500' },
+            { bg: 'bg-orange-50', border: 'border-orange-300', text: 'text-orange-700', btnGood: 'bg-orange-400 hover:bg-orange-500' },
+        ];
+        const CUTE_EMOJIS = ['🐰', '🐧', '🐻', '🐯', '🐼', '🦊', '🐱', '🐶', '🐹', '🐸', '🐨', '🐵'];
+        
+        const PET_FAMILIES = [
+            { id: 0, name: '飛龍', stages: ['🥚', '🐣', '🦎', '🦖', '🐲', '🐉', '☄️', '🌌'], title: '創世星辰龍' },
+            { id: 1, name: '百獸', stages: ['🧶', '🐾', '🐈', '🐱', '🐅', '🐯', '🦁', '👑'], title: '萬獸大帝' },
+            { id: 2, name: '精靈', stages: ['🥚', '🐛', '🐌', '🦋', '🧚‍♀️', '🧚‍♂️', '✨', '🌈'], title: '彩虹大精靈' },
+            { id: 3, name: '神木', stages: ['🌰', '🌱', '🌿', '🪴', '🌳', '🌲', '🍎', '🌍'], title: '世界之樹' },
+            { id: 4, name: '海洋', stages: ['🫧', '🧊', '🐠', '🐟', '🐬', '🦈', '🐳', '🌊'], title: '深海波塞頓' },
+            { id: 5, name: '星空', stages: ['☁️', '🌧️', '🌩️', '🌙', '⭐', '🌟', '💫', '☀️'], title: '宇宙創造者' }
+        ];
+
+        const LEVEL_THRESHOLDS = [0, 5, 10, 15, 20, 25, 30, 35]; 
+        const STAGE_NAMES = ['未孵化', '幼兒期', '成長期', '成熟期', '完全體', '究極體', '覺醒態', '神話態'];
+
+        const GOOD_BEHAVIORS = [
+            { label: '抽屜整潔', score: 4, color: 'bg-emerald-500 hover:bg-emerald-600' },
+            { label: '舉手發言', score: 1, color: 'bg-teal-500 hover:bg-teal-600' },
+            { label: '桌上清空', score: 1, color: 'bg-blue-500 hover:bg-blue-600' },
+            { label: '椅子靠攏', score: 1, color: 'bg-indigo-500 hover:bg-indigo-600' },
+            { label: '整組準時', score: 1, color: 'bg-cyan-500 hover:bg-cyan-600' },
+            { label: '排隊安靜', score: 1, color: 'bg-sky-500 hover:bg-sky-600' }
+        ];
+        const BAD_BEHAVIORS = [
+            { label: '分心', score: -2, color: 'bg-orange-500 hover:bg-orange-600' },
+            { label: '吵鬧', score: -3, color: 'bg-red-500 hover:bg-red-600' },
+            { label: '爭吵', score: -5, color: 'bg-rose-600 hover:bg-rose-700' }
+        ];
+
+        const REWARD_POOL = ['免寫生字半行！', '榮譽卡一格！', '全組糖果一顆！', '擔任一日小幫手！', '下課提早一分鐘！', '免死金牌(抵銷扣分)'];
+        const QUEST_POOL = ['【安靜忍者】接下來 10 分鐘內，全班維持最高品質靜悄悄。','【桌面發亮】下課前，全班桌面淨空不留任何文具書本。','【神速排隊】聽到指令後，30秒內全班排好隊伍。','【坐姿端正】這節課所有人背挺直，不趴桌子。','【熱情參與】這節課舉手發言總次數超過 10 次！'];
+        const PET_QUOTES = ['繼續保持喔！✨', '我想趕快進化...', '肚子好餓，給我分數😋', '今天大家都很棒！', '要乖乖聽老師的話唷！', '加油加油！💪'];
+
+        // === 全域狀態 ===
+        let appState = {
+            classGoal: 200,
+            groups: [
+                { id: 1, name: '第一組', icon: '🐧', score: 0, trophies: 0, themeIndex: 1, petFamilyId: 0 },
+                { id: 2, name: '第二組', icon: '🐰', score: 0, trophies: 0, themeIndex: 0, petFamilyId: 1 },
+                { id: 3, name: '第三組', icon: '🦁', score: 0, trophies: 0, themeIndex: 3, petFamilyId: 2 },
+                { id: 4, name: '第四組', icon: '🐱', score: 0, trophies: 0, themeIndex: 5, petFamilyId: 3 },
+                { id: 5, name: '第五組', icon: '🐼', score: 0, trophies: 0, themeIndex: 2, petFamilyId: 4 },
+                { id: 6, name: '第六組', icon: '🐶', score: 0, trophies: 0, themeIndex: 4, petFamilyId: 5 },
+            ]
+        };
+        let isEditing = false;
+        let soundEnabled = true;
+        let currentUser = null;
+        let animatingScores = {};
+        let levelUpGroups = {};
+        let petBubbles = {};
+        let gachaCards = [];
+
+        // === 音效引擎 (Web Audio API) ===
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        function playTone(freq, type, duration, vol = 0.1) {
+            if (!soundEnabled) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+            gain.gain.setValueAtTime(vol, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + duration);
+        }
+
+        function playSFX(type) {
+            if (!soundEnabled) return;
+            if(type==='good') { playTone(600, 'sine', 0.1); setTimeout(() => playTone(800, 'sine', 0.15), 100); }
+            else if(type==='bad') { playTone(300, 'sawtooth', 0.3, 0.1); setTimeout(() => playTone(250, 'sawtooth', 0.4, 0.1), 150); }
+            else if(type==='levelup') { [400, 500, 600, 800, 1000].forEach((f, i) => setTimeout(() => playTone(f, 'square', 0.1), i * 100)); }
+            else if(type==='tada') { [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => setTimeout(() => playTone(f, 'sine', 0.2), i * 150)); setTimeout(() => playTone(1046.50, 'sine', 0.6), 600); }
+        }
+
+        function toggleSound() {
+            soundEnabled = !soundEnabled;
+            const icon = document.getElementById('sound-icon');
+            if(soundEnabled) {
+                icon.className = 'fa-solid fa-volume-high text-xl';
+                icon.parentElement.classList.remove('text-red-400');
+            } else {
+                icon.className = 'fa-solid fa-volume-xmark text-xl text-red-400';
+            }
+        }
+
+        // === Firebase 雲端同步 ===
+        function setSyncStatus(isSyncing) {
+            const statusDiv = document.getElementById('sync-status');
+            if(isSyncing) {
+                statusDiv.innerHTML = '<i class="fa-solid fa-cloud text-blue-500 mr-1 animate-pulse"></i><span class="text-slate-500 hidden sm:inline">同步中</span>';
+            } else {
+                statusDiv.innerHTML = '<i class="fa-solid fa-check text-green-500 mr-1"></i><span class="text-slate-500 hidden sm:inline">已儲存</span>';
+            }
+        }
+
+        // 確保 Firebase SDK 載入後才執行
+        setTimeout(() => {
+            if(!window.firebaseAuth) { console.error("Firebase not loaded!"); return; }
+            
+            window.firebaseOnAuthStateChanged(window.firebaseAuth, (user) => {
+                currentUser = user;
+                if(user) {
+                    const docRef = window.firebaseDoc(window.firebaseDb, 'artifacts', window.firebaseAppId, 'users', user.uid, 'classData', 'mainDoc');
+                    setSyncStatus(true);
+                    window.firebaseOnSnapshot(docRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            appState = docSnap.data();
+                            renderApp();
+                        } else {
+                            saveToCloud(); // 初始存檔
+                        }
+                        setSyncStatus(false);
+                    }, (error) => {
+                        console.error("Firestore Error:", error);
+                        setSyncStatus(false);
+                    });
+                }
+            });
+        }, 1000);
+
+        async function saveToCloud() {
+            if (!currentUser) return;
+            setSyncStatus(true);
+            try {
+                const docRef = window.firebaseDoc(window.firebaseDb, 'artifacts', window.firebaseAppId, 'users', currentUser.uid, 'classData', 'mainDoc');
+                await window.firebaseSetDoc(docRef, appState);
+            } catch (error) { console.error("Save Error:", error); } 
+            finally { setSyncStatus(false); }
+        }
+
+        // === 核心邏輯 ===
+        function getPetLevel(score) {
+            for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+                if (score >= LEVEL_THRESHOLDS[i]) return i;
+            }
+            return 0;
+        }
+
+        function getProgress(score) {
+            const level = getPetLevel(score);
+            if (level === LEVEL_THRESHOLDS.length - 1) return { percent: 100, nextReq: 0 }; 
+            const currentBase = LEVEL_THRESHOLDS[level];
+            const nextGoal = LEVEL_THRESHOLDS[level + 1];
+            return { percent: Math.max(0, Math.min(100, ((score - currentBase) / (nextGoal - currentBase)) * 100)), nextReq: nextGoal };
+        }
+
+        function getPetStyleClass(level) {
+            switch(level) {
+                case 0: return 'bg-slate-100/50 border-slate-200'; 
+                case 1: return 'bg-blue-50 border-blue-200 shadow-sm'; 
+                case 2: return 'bg-green-50 border-green-300 shadow-md'; 
+                case 3: return 'bg-purple-50 border-purple-400 shadow-lg'; 
+                case 4: return 'bg-gradient-to-br from-indigo-100 to-purple-200 border-indigo-500 shadow-xl'; 
+                case 5: return 'bg-gradient-to-br from-pink-100 to-rose-200 border-rose-500 shadow-2xl'; 
+                case 6: return 'bg-gradient-to-br from-yellow-100 via-amber-200 to-orange-200 border-yellow-500 shadow-[0_0_15px_rgba(251,191,36,0.5)]'; 
+                case 7: return 'bg-gradient-to-br from-yellow-200 via-orange-300 to-red-400 border-yellow-300 shadow-[0_0_30px_rgba(251,191,36,0.8)] animate-pulse-slow'; 
+                default: return 'bg-slate-100 border-slate-200';
+            }
+        }
+
+        function getPetSizeClass(level) {
+            switch(level) {
+                case 0: return 'text-3xl opacity-80';
+                case 1: return 'text-4xl';
+                case 2: return 'text-5xl drop-shadow-sm';
+                case 3: return 'text-6xl drop-shadow-md';
+                case 4: return 'text-7xl drop-shadow-lg';
+                case 5: return 'text-[5rem] drop-shadow-xl hover:scale-110 transition-transform';
+                case 6: return 'text-[5.5rem] drop-shadow-2xl animate-bounce-slow';
+                case 7: return 'text-[6rem] drop-shadow-[0_0_15px_rgba(255,255,255,0.8)] animate-spin-slow'; 
+                default: return 'text-4xl';
+            }
+        }
+
+        // === 操作行為 ===
+        window.updateScore = function(id, delta) {
+            if(isEditing) return;
+            if (delta > 0) playSFX('good'); else playSFX('bad');
+            
+            let isMaxLeveledUp = false;
+            appState.groups = appState.groups.map(g => {
+                if (g.id === id) {
+                    const oldLevel = getPetLevel(g.score);
+                    const newScore = Math.max(0, g.score + delta);
+                    const newLevel = getPetLevel(newScore);
+                    
+                    if (newLevel > oldLevel) {
+                        playSFX('levelup');
+                        levelUpGroups[id] = true;
+                        setTimeout(() => { levelUpGroups[id] = false; renderApp(); }, 1500);
+                        if (newLevel === LEVEL_THRESHOLDS.length - 1) isMaxLeveledUp = true;
+                    }
+                    return { ...g, score: newScore };
+                }
+                return g;
+            });
+
+            animatingScores[id] = true;
+            setTimeout(() => { animatingScores[id] = false; renderApp(); }, 300);
+            
+            saveToCloud();
+            renderApp();
+            if(isMaxLeveledUp) triggerConfetti();
+        };
+
+        window.toggleEditMode = function() {
+            isEditing = !isEditing;
+            const btn = document.getElementById('edit-btn');
+            if(isEditing) {
+                btn.className = "flex items-center gap-2 px-4 py-2 rounded-xl font-bold bg-green-500 text-white shadow-md transition-all card-pop";
+                btn.innerHTML = '<i class="fa-solid fa-check"></i><span class="hidden sm:inline">完成</span>';
+            } else {
+                btn.className = "flex items-center gap-2 px-4 py-2 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200 transition-all card-pop";
+                btn.innerHTML = '<i class="fa-solid fa-gear"></i><span class="hidden sm:inline">設定</span>';
+                saveToCloud(); // 離開編輯模式時存檔
+            }
+            renderApp();
+        };
+
+        window.updateGroupName = function(id, value) {
+            appState.groups = appState.groups.map(g => g.id === id ? { ...g, name: value } : g);
+        };
+
+        window.updateGroupIcon = function(id) {
+            if(!isEditing) return;
+            appState.groups = appState.groups.map(g => {
+                if(g.id === id) {
+                    const idx = CUTE_EMOJIS.indexOf(g.icon);
+                    return { ...g, icon: CUTE_EMOJIS[(idx + 1) % CUTE_EMOJIS.length] };
+                }
+                return g;
+            });
+            renderApp();
+        };
+
+        window.changePetFamily = function(id) {
+            if(!isEditing) return;
+            appState.groups = appState.groups.map(g => {
+                if(g.id === id) return { ...g, petFamilyId: (g.petFamilyId + 1) % PET_FAMILIES.length };
+                return g;
+            });
+            renderApp();
+        };
+
+        // 目標分數處理
+        window.toggleGoalEdit = function() {
+            if(!isEditing) return;
+            document.getElementById('class-goal-display').classList.add('hidden');
+            const input = document.getElementById('class-goal-input');
+            input.classList.remove('hidden');
+            input.value = appState.classGoal;
+            input.focus();
+        };
+
+        window.saveGoal = function(val) {
+            const num = parseInt(val);
+            if(num && num > 0) {
+                appState.classGoal = num;
+                saveToCloud();
+            }
+            document.getElementById('class-goal-input').classList.add('hidden');
+            document.getElementById('class-goal-display').classList.remove('hidden');
+            renderApp();
+        };
+
+        // === 寵物碎碎念引擎 ===
+        setInterval(() => {
+            if (isEditing) return;
+            const randomGroup = appState.groups[Math.floor(Math.random() * appState.groups.length)];
+            const randomQuote = PET_QUOTES[Math.floor(Math.random() * PET_QUOTES.length)];
+            petBubbles[randomGroup.id] = randomQuote;
+            renderApp();
+            
+            setTimeout(() => {
+                delete petBubbles[randomGroup.id];
+                renderApp();
+            }, 5000);
+        }, 15000);
+
+        // === 畫面渲染引擎 ===
+        function renderApp() {
+            // 1. 渲染頂部集氣條
+            const totalScore = appState.groups.reduce((sum, g) => sum + g.score, 0);
+            const percent = Math.min(100, (totalScore / appState.classGoal) * 100);
+            document.getElementById('class-score-display').innerText = totalScore;
+            document.getElementById('class-goal-display').innerText = appState.classGoal;
+            document.getElementById('class-progress-bar').style.width = percent + '%';
+            
+            const badge = document.getElementById('goal-reached-badge');
+            if(percent >= 100) badge.classList.remove('hidden');
+            else badge.classList.add('hidden');
+
+            // 2. 渲染小組卡片
+            const container = document.getElementById('groups-container');
+            const maxScore = Math.max(...appState.groups.map(g => g.score), 0);
+            
+            let html = '';
+            appState.groups.forEach(group => {
+                const petLevel = getPetLevel(group.score);
+                const progress = getProgress(group.score);
+                const family = PET_FAMILIES[group.petFamilyId];
+                const currentEmoji = family.stages[petLevel];
+                const theme = CUTE_COLORS[group.themeIndex];
+                const isMaxLevel = petLevel === LEVEL_THRESHOLDS.length - 1;
+                const isWinner = group.score === maxScore && maxScore > 0 && !isEditing;
+                const isAnimating = animatingScores[group.id];
+                const isLevelingUp = levelUpGroups[group.id];
+
+                html += `
+                <div class="relative flex flex-col p-4 rounded-3xl border-4 shadow-md transition-all duration-300 ${theme.bg} ${theme.border} ${isEditing ? 'animate-pulse' : ''}">
+                    
+                    ${isWinner ? `<div class="absolute -top-5 left-1/2 transform -translate-x-1/2 text-yellow-500 drop-shadow-md animate-bounce z-10"><i class="fa-solid fa-award text-4xl"></i></div>` : ''}
+
+                    <!-- 頂部：組別與分數 -->
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center gap-2">
+                            <div class="text-3xl cursor-pointer ${isEditing ? 'hover:scale-110 hover:rotate-12 transition-transform' : ''}" onclick="updateGroupIcon(${group.id})">${group.icon}</div>
+                            <div class="flex flex-col">
+                                ${isEditing 
+                                    ? `<input type="text" value="${group.name}" onchange="updateGroupName(${group.id}, this.value)" class="text-xl font-bold bg-white/50 border-b-2 border-dashed border-slate-400 focus:outline-none w-20 px-1"/>` 
+                                    : `<h2 class="text-xl font-black leading-tight ${theme.text}">${group.name}</h2>`
+                                }
+                                <div class="flex items-center mt-0.5 min-h-[20px]">
+                                    ${group.trophies > 0 ? `<div class="flex items-center bg-yellow-100 px-1.5 py-0.5 rounded-full border border-yellow-300 mr-1"><i class="fa-solid fa-trophy text-[10px] text-yellow-600 mr-0.5"></i><span class="text-xs font-black text-yellow-700">${group.trophies}</span></div>` : ''}
+                                    ${!isEditing && isMaxLevel ? `<span class="text-[10px] font-black bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500 bg-clip-text text-transparent drop-shadow-sm whitespace-nowrap">« ${family.title} »</span>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white/90 rounded-xl px-3 py-1 shadow-sm border-2 border-white flex items-center justify-center min-w-[70px]">
+                            <span class="text-2xl font-black tabular-nums transition-transform duration-200 ${theme.text} ${isAnimating ? 'score-bump' : ''}">${group.score}</span>
+                        </div>
+                    </div>
+
+                    <!-- ✨ 寵物進化區塊 ✨ -->
+                    <div class="relative flex flex-col items-center justify-center rounded-2xl p-2 mb-3 h-36 border-2 transition-all duration-700 overflow-hidden cursor-pointer ${getPetStyleClass(petLevel)} ${isEditing ? 'hover:brightness-95' : ''}" onclick="changePetFamily(${group.id})">
+                        
+                        ${petBubbles[group.id] && !isEditing ? `
+                        <div class="absolute top-2 right-2 bg-white px-3 py-1.5 rounded-2xl rounded-br-none shadow-md z-30 animate-float-up flex items-center gap-1 border border-slate-200">
+                            <i class="fa-regular fa-comment-dots text-slate-400 text-sm"></i>
+                            <span class="text-xs font-bold text-slate-700">${petBubbles[group.id]}</span>
+                        </div>` : ''}
+
+                        ${isLevelingUp ? `
+                        <div class="absolute inset-0 z-20 flex items-center justify-center pointer-events-none">
+                            <div class="absolute w-[200%] h-[200%] bg-white animate-[ping_0.8s_ease-out_forwards]"></div>
+                            <div class="absolute w-[150%] h-[150%] bg-yellow-300/50 animate-spin-slow"></div>
+                        </div>` : ''}
+                        
+                        <div class="transition-all duration-700 ease-out z-10 flex-1 flex items-center justify-center ${getPetSizeClass(petLevel)} ${isLevelingUp ? 'level-up-glow' : ''}">
+                            ${currentEmoji}
+                        </div>
+
+                        <div class="absolute top-2 left-2 backdrop-blur-sm px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold shadow-sm border z-10 ${isMaxLevel ? 'bg-black/80 text-yellow-400 border-yellow-600' : 'bg-white/90 text-slate-600 border-slate-200'}">
+                            ${family.name} · <span class="${isMaxLevel ? 'animate-pulse' : ''}">${STAGE_NAMES[petLevel]}</span>
+                        </div>
+                        ${isEditing ? '<i class="fa-solid fa-chevron-right absolute top-2 right-2 text-slate-400"></i>' : ''}
+                    </div>
+
+                    <!-- 經驗值條 -->
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="text-xs font-bold text-slate-500 whitespace-nowrap w-[3.5rem] text-right">
+                            ${isMaxLevel ? '🎉 封神' : `差 ${progress.nextReq - group.score} 分`}
+                        </div>
+                        <div class="flex-1 h-2.5 bg-slate-200/80 rounded-full overflow-hidden shadow-inner">
+                            <div class="h-full transition-all duration-700 ease-out relative ${isMaxLevel ? 'bg-gradient-to-r from-red-500 via-orange-500 to-yellow-500' : 'bg-gradient-to-r from-green-400 to-emerald-500'}" style="width: ${progress.percent}%;">
+                                <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 按鈕操作區 -->
+                    ${!isEditing ? `
+                    <div class="flex flex-col gap-1.5 mt-auto">
+                        <div class="grid grid-cols-2 gap-1.5">
+                            ${GOOD_BEHAVIORS.map(btn => `
+                            <button onclick="updateScore(${group.id}, ${btn.score})" class="flex justify-center items-center py-1.5 px-1 rounded-lg text-white font-bold text-[13px] shadow-sm transition-transform active:scale-95 ${btn.color}">
+                                ${btn.label} <i class="fa-solid fa-plus text-[10px] ml-1"></i>${btn.score}
+                            </button>`).join('')}
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5 mt-0.5">
+                            ${BAD_BEHAVIORS.map(btn => `
+                            <button onclick="updateScore(${group.id}, ${btn.score})" class="flex justify-center items-center py-1.5 px-1 rounded-lg text-white font-bold text-[13px] shadow-sm transition-transform active:scale-95 ${btn.color}">
+                                ${btn.label} ${btn.score}
+                            </button>`).join('')}
+                        </div>
+                        <div class="grid grid-cols-2 gap-1.5 mt-0.5">
+                            <button onclick="updateScore(${group.id}, -1)" class="flex justify-center items-center py-2 rounded-lg text-white font-black shadow-sm transition-transform active:scale-95 bg-slate-400 hover:bg-slate-500">- 1</button>
+                            <button onclick="updateScore(${group.id}, 1)" class="flex justify-center items-center py-2 rounded-lg text-white font-black shadow-sm transition-transform active:scale-95 ${theme.btnGood}">+ 1</button>
+                        </div>
+                    </div>
+                    ` : '<div class="mt-auto pt-4 text-center text-sm font-bold text-slate-500 border-t-2 border-dashed border-slate-300">點擊名稱、頭像或寵物來修改設定</div>'}
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        // === 彈出視窗與特效系統 ===
+        window.triggerConfetti = function() {
+            playSFX('tada');
+            const container = document.getElementById('confetti-container');
+            container.innerHTML = '';
+            const colors = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
+            for(let i=0; i<80; i++) {
+                const conf = document.createElement('div');
+                conf.className = 'confetti';
+                conf.style.left = Math.random() * 100 + 'vw';
+                conf.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                conf.style.animationDelay = Math.random() * 2 + 's';
+                conf.style.animationDuration = 2 + Math.random() * 2 + 's';
+                container.appendChild(conf);
+            }
+            setTimeout(() => { container.innerHTML = ''; }, 5000);
+        }
+
+        window.openModal = function(type) {
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            document.getElementById('modal-quest').classList.add('hidden');
+            document.getElementById('modal-settlement').classList.add('hidden');
+            document.getElementById('modal-gacha').classList.add('hidden');
+
+            if(type === 'quest') {
+                document.getElementById('modal-quest').classList.remove('hidden');
+                document.getElementById('quest-content').innerText = QUEST_POOL[Math.floor(Math.random() * QUEST_POOL.length)];
+            } 
+            else if(type === 'settlement') {
+                document.getElementById('modal-settlement').classList.remove('hidden');
+                const maxScore = Math.max(...appState.groups.map(g => g.score), 0);
+                const winners = appState.groups.filter(g => g.score === maxScore && maxScore > 0);
+                let contentHTML = '';
+                if(maxScore > 0) {
+                    contentHTML = '<p class="text-slate-600 font-bold mb-4">掌聲鼓勵！本週獲得最高分的冠軍是：</p><div class="flex flex-wrap justify-center gap-4">';
+                    winners.forEach(w => {
+                        const theme = CUTE_COLORS[w.themeIndex];
+                        contentHTML += `
+                        <div class="px-6 py-3 rounded-2xl ${theme.bg} ${theme.border} border-2 flex items-center gap-3 shadow-md">
+                            <span class="text-4xl">${w.icon}</span>
+                            <div class="text-left"><div class="font-black text-xl ${theme.text}">${w.name}</div><div class="text-sm font-bold text-slate-500">${w.score} 分</div></div>
+                        </div>`;
+                    });
+                    contentHTML += '</div>';
+                } else {
+                    contentHTML = '<p class="text-slate-600 font-bold text-lg">這週大家都還沒有得分喔！下週繼續努力！</p>';
+                }
+                document.getElementById('settlement-content').innerHTML = contentHTML;
+            }
+        };
+
+        window.closeModal = function() {
+            document.getElementById('modal-overlay').classList.add('hidden');
+        };
+
+        window.executeSettlement = function() {
+            triggerConfetti();
+            const maxScore = Math.max(...appState.groups.map(g => g.score), 0);
+            appState.groups = appState.groups.map(g => ({ 
+                ...g, score: 0, 
+                trophies: (g.score === maxScore && maxScore > 0) ? g.trophies + 1 : g.trophies 
+            }));
+            saveToCloud();
+            renderApp();
+            closeModal();
+        };
+
+        // 抽卡系統
+        window.openGacha = function() {
+            const shuffled = [...REWARD_POOL].sort(() => 0.5 - Math.random());
+            gachaCards = [
+                { id: 1, flipped: false, reward: shuffled[0] },
+                { id: 2, flipped: false, reward: shuffled[1] },
+                { id: 3, flipped: false, reward: shuffled[2] }
+            ];
+            
+            document.getElementById('gacha-result').classList.add('hidden');
+            renderGachaCards();
+            
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            document.getElementById('modal-quest').classList.add('hidden');
+            document.getElementById('modal-settlement').classList.add('hidden');
+            document.getElementById('modal-gacha').classList.remove('hidden');
+        };
+
+        function renderGachaCards() {
+            const container = document.getElementById('gacha-cards');
+            let html = '';
+            const anyFlipped = gachaCards.some(c => c.flipped);
+
+            gachaCards.forEach(card => {
+                const isFlipped = card.flipped;
+                const opacityClass = (anyFlipped && !isFlipped) ? 'opacity-50 grayscale' : '';
+                
+                html += `
+                <div onclick="flipGachaCard(${card.id})" class="relative w-full sm:w-48 h-64 perspective-1000 cursor-pointer transition-transform hover:-translate-y-2 ${opacityClass}">
+                    <div class="w-full h-full transition-all duration-500 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}">
+                        <!-- 卡背 -->
+                        <div class="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-xl flex items-center justify-center border-4 border-indigo-300">
+                            <span class="text-6xl text-white font-black opacity-50">?</span>
+                        </div>
+                        <!-- 卡面 -->
+                        <div class="absolute inset-0 backface-hidden rotate-y-180 bg-white rounded-2xl shadow-2xl flex flex-col items-center justify-center border-4 border-yellow-400 p-4">
+                            <span class="text-5xl mb-4 animate-bounce">🎉</span>
+                            <p class="text-2xl font-black text-slate-800 text-center leading-tight">${card.reward}</p>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        window.flipGachaCard = function(id) {
+            if (gachaCards.some(c => c.flipped)) return; // 只能翻一張
+            playSFX('levelup');
+            gachaCards = gachaCards.map(c => c.id === id ? { ...c, flipped: true } : c);
+            renderGachaCards();
+            
+            setTimeout(() => {
+                document.getElementById('gacha-result').classList.remove('hidden');
+                triggerConfetti();
+            }, 600);
+        };
+
+        // 初始渲染 (防閃爍)
+        renderApp();
+
+    </script>
+</body>
+</html>
